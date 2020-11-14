@@ -26,7 +26,7 @@ bool isSPD(MatrixXd A)
         return true;
     }
 
-    std::cout << "Matrix is NOT SPD" << std::endl;
+//    std::cout << "Matrix is NOT SPD" << std::endl;
     return false;
 }
 
@@ -76,15 +76,6 @@ MatrixXd nearestSPD(MatrixXd A)
     // end while
 }
 
-//define factorial function, input i, output i!
-double Factorial(int x)
-{
-    double fac = 1;
-    for (int i = x; i > 0; i--)
-        fac = fac * i;
-    return fac;
-}
-
 bool BezierTrajGenerator::TrajGeneration(Eigen::Vector3d start_pt,Eigen::Vector3d end_pt,vector<Cube> corridor)
 {
     isTraj= false;
@@ -94,7 +85,7 @@ bool BezierTrajGenerator::TrajGeneration(Eigen::Vector3d start_pt,Eigen::Vector3
     _end_pt = end_pt;
 
     n_seg = corridor.size();//  有多少个走廊就有多少段轨迹
-    n_all_coeff = n_seg*n_coeff;
+    n_all_coeff = n_seg*n_coeff-(n_seg-1);
 
     timeAllocation();
 
@@ -178,8 +169,6 @@ bool BezierTrajGenerator::TrajGeneration(Eigen::Vector3d start_pt,Eigen::Vector3
         }
 
     }
-
-
 }
 
 
@@ -192,6 +181,7 @@ bool BezierTrajGenerator::TrajGeneration(Eigen::Vector3d start_pt,Eigen::Vector3
 void BezierTrajGenerator::timeAllocation()
 {
     _totalTime = 0;
+    _max_t_seg =1;
     double dis =0;
     for (int i = 0; i < n_seg; ++i)
     {
@@ -215,6 +205,10 @@ void BezierTrajGenerator::timeAllocation()
             _corridor[i].t = 2*_Vel_max / _Acc_max + (dis - _Vel_max * _Vel_max / _Acc_max) / _Vel_max;
         }
         cout << "time:" << endl << _corridor[i].t << endl;
+        if(_corridor[i].t>_max_t_seg)
+        {
+            _max_t_seg = _corridor[i].t;
+        }
         _totalTime += _corridor[i].t;
     }
 }
@@ -236,10 +230,10 @@ Eigen::MatrixXd BezierTrajGenerator::getM() {
             7  ,-42 , 105, -140,  105 ,-42 , 7 , 0,
             -1 ,  7 ,  -21 ,  35,  -35 , 21 ,-7 , 1;
 
-    MatrixXd M = MatrixXd::Zero(n_seg * n_coeff, n_seg * n_coeff);
+    MatrixXd M = MatrixXd::Zero(n_seg * n_coeff, n_all_coeff);
     for(int i = 0;i<n_seg;++i)
     {
-        M.block(i * n_coeff, i * n_coeff, n_coeff, n_coeff) = M_k;
+        M.block(i * n_coeff, i * (n_coeff-1), n_coeff, n_coeff) = M_k;
     }
     return M;
 }
@@ -307,13 +301,12 @@ Eigen::MatrixXd BezierTrajGenerator::getAeq()
             0,   0,  0, 0, 0, 0, -n_order, n_order,   //  v
             0, 0, 0, 0, 0, n_2, -2*n_2, n_2;   //  a
 
-    MatrixXd Aeq_con_p = MatrixXd::Zero(n_seg-1,n_all_coeff);
     MatrixXd Aeq_con_v = MatrixXd::Zero(n_seg-1,n_all_coeff);
     MatrixXd Aeq_con_a = MatrixXd::Zero(n_seg-1,n_all_coeff);
 
     for(int i=0;i<n_seg-1;++i)
     {
-        int index = n_coeff-1 + n_coeff*i;
+        int index = n_coeff-1 + n_order*i;
 
         /**
          * 连续性条件
@@ -322,26 +315,17 @@ Eigen::MatrixXd BezierTrajGenerator::getAeq()
          * p:对应前一控制点与后一控制点相同
          * c_(i)-c_(i+1) = 0
          */
-        Aeq_con_p(i,index) = 1;
-        Aeq_con_p(i,index+1) = -1;
-
-        Aeq_con_v(i,index-1) = -n_order;    Aeq_con_v(i,index) = n_order;
-        Aeq_con_v(i,index+1) = n_order;    Aeq_con_v(i,index+2) = -n_order;
-
-        Aeq_con_a(i,index-2) = n_2;    Aeq_con_a(i,index-1) = -2*n_2;  Aeq_con_a(i,index) = n_2;
-        Aeq_con_a(i,index+1) = -n_2;    Aeq_con_a(i,index+2) = 2*n_2;  Aeq_con_a(i,index+3) = -n_2;
+        //  v
+        Aeq_con_v(i,index-1) = -n_order;    Aeq_con_v(i,index) = 2*n_order; Aeq_con_v(i,index+1) = -n_order;
+        //  a
+        Aeq_con_a(i,index-2) = n_2;    Aeq_con_a(i,index-1) = -2*n_2; Aeq_con_a(i,index+1) = 2*n_2;  Aeq_con_a(i,index+2) = -n_2;
     }
-
-    MatrixXd Aeq = MatrixXd::Zero(6+3*(n_seg-1),n_all_coeff);
+    MatrixXd Aeq = MatrixXd::Zero(6+2*(n_seg-1),n_all_coeff);
     Aeq<<Aeq_start,MatrixXd::Zero(3,n_all_coeff-n_coeff),
             MatrixXd::Zero(3,n_all_coeff-n_coeff),Aeq_end,
-            Aeq_con_p,
             Aeq_con_v,
             Aeq_con_a;
 
-//    cout<<Aeq<<endl;
-//    cout<<"Aeq.rows()"<<Aeq.rows()<<endl;
-//    cout<<"Aeq.cols()"<<Aeq.cols()<<endl;
     return Aeq;
 }
 
@@ -351,30 +335,20 @@ Eigen::MatrixXd BezierTrajGenerator::getAeq()
  */
 Eigen::VectorXd BezierTrajGenerator::getbeq(int axis)
 {
-    Eigen::VectorXd beq_start(3);
+    Eigen::VectorXd beq_start = Eigen::VectorXd::Zero(3);
     beq_start<<_start_pt(axis),
             0,
             0;
 
-    Eigen::VectorXd beq_end(3);
+    Eigen::VectorXd beq_end= Eigen::VectorXd::Zero(3);
     beq_end<<_end_pt(axis),
             0,
             0;
 
-    Eigen::VectorXd beq_con_p = Eigen::VectorXd::Zero(n_seg-1);
-    Eigen::VectorXd beq_con_v = Eigen::VectorXd::Zero(n_seg-1);
-    Eigen::VectorXd beq_con_a = Eigen::VectorXd::Zero(n_seg-1);
+    Eigen::VectorXd beq = Eigen::VectorXd::Zero(6+2*(n_seg-1));
+    beq.block(0,0,3,1) = beq_start;
+    beq.block(3,0,3,1) = beq_end;
 
-    Eigen::VectorXd beq = Eigen::VectorXd::Zero(6+3*(n_seg-1));
-    beq<<beq_start,
-            beq_end,
-            beq_con_p,
-            beq_con_v,
-            beq_con_a;
-
-//    cout<<beq<<endl;
-//    cout<<"beq.rows()"<<endl;
-//    cout<<beq.rows()<<endl;
     return beq;
 }
 
@@ -383,62 +357,47 @@ Eigen::VectorXd BezierTrajGenerator::getbeq(int axis)
  * @return
  */
 Eigen::MatrixXd BezierTrajGenerator::getAieq() {
-    int n_constraint_p = n_seg*(n_coeff-1)-1;   //  去掉首尾,首尾已有等式约束限制
+    int n_constraint_p = n_all_coeff-2;   //  去掉首尾,首尾已有等式约束限制
 
     /**
      * Ac<b
      */
     MatrixXd Aieq_p = MatrixXd::Zero(n_constraint_p, n_all_coeff);
-    for(int i = 0;i<n_seg-1;++i)//  n_seg-1:最后一段单独设置(终点是等式约束)
+    for(int i = 0;i<n_constraint_p;++i)//  n_seg-1:最后一段单独设置(终点是等式约束)
     {
         /**
          * (n_coeff-1)*i:   因为不考虑初始点,同理往后顺延所以带入的是eye(7)
          * 1+n_coeff*i:   不含初始点(因为初始点是等式约束)
          */
-        Aieq_p.block((n_coeff - 1) * i, 1 + n_coeff * i, 7, 7) = MatrixXd::Identity(7, 7);
+        Aieq_p(i, 1 + i) = 1;
     }
-    Aieq_p.block(n_constraint_p - 6, n_all_coeff - 7, 6, 6) = MatrixXd::Identity(6, 6);//   因为每段轨迹间共用一个控制点,所以最后要留空给终点(等式约束)
 
+    int n_constraint_v = n_all_coeff-3;
+    int d1 = n_order/_max_t_seg;
+    int d2 = n_order*(n_order-1)/(_max_t_seg*_max_t_seg);
 
-    int n_constraint_v = n_seg*n_order;
-    int d1 = n_order;
-    int d2 = n_order*(n_order-1);
-
-    MatrixXd derivate_matrix(7,8);
-    derivate_matrix<<-d1, d1,  0,   0,   0,   0,   0,  0,
-            0, -d1, d1,   0,   0,   0,   0,  0,
-            0,  0, -d1,  d1,   0,   0,   0,  0,
-            0,  0,   0, -d1,  d1,   0,   0,  0,
-            0,  0,   0,   0, -d1,  d1,   0,  0,
-            0,  0,   0,   0,   0, -d1,  d1,  0,
-            0,  0,   0,   0,   0,   0, -d1, d1;
+    MatrixXd derivate_matrix(1,2);
+    derivate_matrix<<-d1, d1;
     MatrixXd Aieq_v = MatrixXd::Zero(n_constraint_v, n_all_coeff);
-    for(int i =0;i<n_seg;++i)
+    for(int i =0;i<n_constraint_v;++i)
     {
-        Aieq_v.block((n_coeff - 1) * i, n_coeff * i, 7, 8) = derivate_matrix;
+        Aieq_v.block(i, 1+ i, 1, 2) = derivate_matrix;
     }
 
-    int n_constraint_a = n_seg*(n_coeff-2);
-    MatrixXd dderivate_matrix(6,8);
-    dderivate_matrix<<d2, -2*d2,    d2,     0,     0,     0,     0,  0,
-            0,    d2, -2*d2,    d2,     0,     0,     0,  0,
-            0,     0,    d2, -2*d2,    d2,     0,     0,  0,
-            0,     0,     0,    d2, -2*d2,    d2,     0,  0,
-            0,     0,     0,     0,    d2, -2*d2,    d2,  0,
-            0,     0,     0,     0,     0,    d2, -2*d2,  d2;
+    int n_constraint_a = n_all_coeff-4;
+
+    MatrixXd dderivate_matrix(1,3);
+    dderivate_matrix<<d2, -2*d2,    d2;
     MatrixXd Aieq_a = MatrixXd::Zero(n_constraint_a, n_all_coeff);
-    for(int i =0;i<n_seg;++i)
+    for(int i =0;i<n_constraint_a;++i)
     {
-        Aieq_a.block((n_coeff - 2) * i, n_coeff * i, 6, 8) =dderivate_matrix;
+        Aieq_a.block(i, 1+i, 1, 3) =dderivate_matrix;
     }
 
-    MatrixXd Aieq((n_constraint_p), n_all_coeff);//+n_constraint_v+n_constraint_a
-    Aieq << Aieq_p;
-//            Aieq_v;
-//            Aieq_a;
-//    cout<<Aieq_a<<endl;
-//    cout<<"Aieq_a.rows()"<<Aieq_a.rows()<<endl;
-//    cout<<"Aieq_a.cols()"<<Aieq_a.cols()<<endl;
+    MatrixXd Aieq(n_constraint_p+n_constraint_v+n_constraint_a, n_all_coeff);//
+    Aieq << Aieq_p,
+            Aieq_v,
+            Aieq_a;
     return Aieq;
 }
 
@@ -446,94 +405,8 @@ Eigen::MatrixXd BezierTrajGenerator::getAieq() {
  * 不等式约束(安全约束,动态性能约束)构造不等式bieq
  * @return
  */
-Eigen::VectorXd BezierTrajGenerator::getbieq(int axis){
-    int n_constraint_p = n_seg*(n_coeff-1)-1;   //  去掉首尾,首尾已有等式约束限制
-
-    /**
-     * Ac<b
-     */
-    Eigen::VectorXd bieq_p_plus = Eigen::VectorXd::Zero(n_constraint_p);
-    for(int i = 0;i<n_seg;++i)
-    {
-        int first_coeff_index = (n_coeff-1)*i;
-        /**
-         *  对每段 2:n_coeff-1 个点进行限制
-         *  这些点一定在该走廊的上下界
-         */
-
-        for(int k = 0;k<n_coeff-2;++k)
-        {
-            bieq_p_plus(first_coeff_index+k) = _corridor[i].max_pt(axis);
-        }
-        /**
-         * 对每段第 n_coeff 个点进行限制(走廊的交接点)
-         * 第n_coeff点是轨迹间共同控制点
-         * 其上界要根据两走廊的最小上界决定
-         */
-        if(i!=n_seg-1)
-        {
-            if(_corridor[i+1].max_pt(axis)>_corridor[i].max_pt(axis))//    对比相关点当前走廊最大限制和下一走廊最小限制,取最大的作为限制
-            {
-                bieq_p_plus(first_coeff_index+6) = max(_corridor[i].max_pt(axis),_corridor[i+1].min_pt(axis));
-            }
-            else
-            {
-                bieq_p_plus(first_coeff_index+6) = max(_corridor[i].min_pt(axis),_corridor[i+1].max_pt(axis));
-            }
-        }
-    }
-
-    /**
-     * -Ac<-a
-     */
-    Eigen::VectorXd bieq_p_minus = MatrixXd::Zero(n_constraint_p,1);
-    for(int i = 0;i<n_seg;++i)
-    {
-        int first_coeff_index = (n_coeff-1)*i;
-        /**
-         *  对每段 2:n_coeff-1 个点进行限制
-         */
-        for(int k = 0;k<n_coeff-2;++k)
-        {
-            bieq_p_minus(first_coeff_index+k) = -_corridor[i].min_pt(axis);
-        }
-        /**
-         * 对每段第 n_coeff 个点进行限制
-         * 第n_coeff点是轨迹间共同控制点
-         */
-        if(i!=n_seg-1)
-        {
-            if(_corridor[i+1].max_pt(axis)>_corridor[i].max_pt(axis))//    对比相关点当前走廊最大限制和下一走廊最小限制,取最大的作为限制
-            {
-                bieq_p_minus(first_coeff_index+6) = -min(_corridor[i].max_pt(axis),_corridor[i+1].min_pt(axis));
-            }
-            else
-            {
-                bieq_p_minus(first_coeff_index+6) = -min(_corridor[i].min_pt(axis),_corridor[i+1].max_pt(axis));
-            }
-        }
-    }
-    Eigen::VectorXd bieq_p = Eigen::VectorXd::Zero(2*n_constraint_p);//   x2:+-约束
-    bieq_p<<bieq_p_plus,
-            bieq_p_minus;
-
-    int n_constraint_v = n_seg*(n_coeff-1);
-    Eigen::VectorXd bieq_v = Eigen::VectorXd::Constant(2*n_constraint_v,_Vel_max);
-
-    int n_constraint_a = n_seg*(n_coeff-2);
-    Eigen::VectorXd bieq_a = Eigen::VectorXd::Constant(2*n_constraint_a,_Acc_max);
-
-    Eigen::VectorXd bieq(2*(n_constraint_p));//+n_constraint_v+n_constraint_a
-    bieq<<bieq_p;
-//            bieq_v;
-//            bieq_a;
-    cout<<bieq_p<<endl;
-    cout<<"bieq_a.rows()"<<bieq_p.rows()<<endl;
-    return bieq;
-}
-
 Eigen::VectorXd BezierTrajGenerator::getbieq_plus(int axis){
-    int n_constraint_p = n_seg*(n_coeff-1)-1;   //  去掉首尾,首尾已有等式约束限制
+    int n_constraint_p = n_all_coeff-2;   //  去掉首尾,首尾已有等式约束限制
 
     /**
      * Ac<b
@@ -558,34 +431,34 @@ Eigen::VectorXd BezierTrajGenerator::getbieq_plus(int axis){
          */
         if(i!=n_seg-1)
         {
-            if(_corridor[i+1].max_pt(axis)>_corridor[i].max_pt(axis))//    对比相关点当前走廊最大限制和下一走廊最小限制,取最大的作为限制
-            {
-                bieq_p_plus(first_coeff_index+6) = max(_corridor[i].max_pt(axis),_corridor[i+1].min_pt(axis));
-            }
-            else
-            {
-                bieq_p_plus(first_coeff_index+6) = max(_corridor[i].min_pt(axis),_corridor[i+1].max_pt(axis));
-            }
+                bieq_p_plus(first_coeff_index+n_coeff-2) = min(_corridor[i].max_pt(axis),_corridor[i+1].max_pt(axis));
+
+//            if(_corridor[i+1].max_pt(axis)>_corridor[i].max_pt(axis))//    对比相关点当前走廊最大限制和下一走廊最小限制,取最大的作为限制
+//            {
+//                bieq_p_plus(first_coeff_index+n_coeff-2) = max(_corridor[i].max_pt(axis),_corridor[i+1].min_pt(axis));
+//            }
+//            else
+//            {
+//                bieq_p_plus(first_coeff_index+n_coeff-2) = max(_corridor[i].min_pt(axis),_corridor[i+1].max_pt(axis));
+//            }
         }
     }
 
-    int n_constraint_v = n_seg*(n_coeff-1);
+    int n_constraint_v = n_all_coeff-3;
     Eigen::VectorXd bieq_v_plus = Eigen::VectorXd::Constant(n_constraint_v,_Vel_max);
 
-    int n_constraint_a = n_seg*(n_coeff-2);
+    int n_constraint_a = n_all_coeff-4;
     Eigen::VectorXd bieq_a_plus = Eigen::VectorXd::Constant(n_constraint_a,_Acc_max);
 
-    Eigen::VectorXd bieq_plus((n_constraint_p));//+n_constraint_v+n_constraint_a
-    bieq_plus<<bieq_p_plus;
-//            bieq_v;
-//            bieq_a;
-//    cout<<bieq_p<<endl;
-//    cout<<"bieq_a.rows()"<<bieq_p.rows()<<endl;
+    Eigen::VectorXd bieq_plus(n_constraint_p+n_constraint_v+n_constraint_a);//
+    bieq_plus<<bieq_p_plus,
+            bieq_v_plus,
+            bieq_a_plus;
     return bieq_plus;
 }
 
 Eigen::VectorXd BezierTrajGenerator::getbieq_minus(int axis){
-    int n_constraint_p = n_seg*(n_coeff-1)-1;   //  去掉首尾,首尾已有等式约束限制
+    int n_constraint_p = n_all_coeff-2;   //  去掉首尾,首尾已有等式约束限制
 
     /**
      * -Ac<-a
@@ -607,29 +480,30 @@ Eigen::VectorXd BezierTrajGenerator::getbieq_minus(int axis){
          */
         if(i!=n_seg-1)
         {
-            if(_corridor[i+1].max_pt(axis)>_corridor[i].max_pt(axis))//    对比相关点当前走廊最大限制和下一走廊最小限制,取最大的作为限制
-            {
-                bieq_p_minus(first_coeff_index+6) = min(_corridor[i].max_pt(axis),_corridor[i+1].min_pt(axis));
-            }
-            else
-            {
-                bieq_p_minus(first_coeff_index+6) = min(_corridor[i].min_pt(axis),_corridor[i+1].max_pt(axis));
-            }
+                bieq_p_minus(first_coeff_index+n_coeff-2) = max(_corridor[i].min_pt(axis),_corridor[i+1].min_pt(axis));
+
+
+//            if(_corridor[i+1].max_pt(axis)>_corridor[i].max_pt(axis))//    对比相关点当前走廊最大限制和下一走廊最小限制,取最大的作为限制
+//            {
+//                bieq_p_minus(first_coeff_index+n_coeff-2) = min(_corridor[i].max_pt(axis),_corridor[i+1].min_pt(axis));
+//            }
+//            else
+//            {
+//                bieq_p_minus(first_coeff_index+n_coeff-2) = min(_corridor[i].min_pt(axis),_corridor[i+1].max_pt(axis));
+//            }
         }
     }
 
-    int n_constraint_v = n_seg*(n_coeff-1);
-    Eigen::VectorXd bieq_v = Eigen::VectorXd::Constant(n_constraint_v,-_Vel_max);
+    int n_constraint_v = n_all_coeff-3;
+    Eigen::VectorXd bieq_v_minus = Eigen::VectorXd::Constant(n_constraint_v, -_Vel_max);
 
-    int n_constraint_a = n_seg*(n_coeff-2);
-    Eigen::VectorXd bieq_a = Eigen::VectorXd::Constant(n_constraint_a,-_Acc_max);
+    int n_constraint_a = n_all_coeff-4;
+    Eigen::VectorXd bieq_a_minus = Eigen::VectorXd::Constant(n_constraint_a, -_Acc_max);
 
-    Eigen::VectorXd bieq_minus((n_constraint_p));//+n_constraint_v+n_constraint_a
-    bieq_minus<<bieq_p_minus;
-//            bieq_v;
-//            bieq_a;
-//    cout<<bieq_p<<endl;
-//    cout<<"bieq_a.rows()"<<bieq_p.rows()<<endl;
+    Eigen::VectorXd bieq_minus(n_constraint_p+n_constraint_v+n_constraint_a);//
+    bieq_minus<<bieq_p_minus,
+            bieq_v_minus,
+            bieq_a_minus;
     return bieq_minus;
 }
 
@@ -651,8 +525,8 @@ Vector3d BezierTrajGenerator::getPolyStates(int k, double t_seg, int order)
     {
         for(int j =0;j<=I_range;++j)
         {
-            temp_solution[0](j+k*n_coeff) = temp_solution[0](j+1+k*n_coeff) - temp_solution[0](j+k*n_coeff);
-            temp_solution[1](j+k*n_coeff) = temp_solution[1](j+1+k*n_coeff) - temp_solution[1](j+k*n_coeff);
+            temp_solution[0](j+k*(n_coeff-1)) = temp_solution[0](j+1+k*(n_coeff-1)) - temp_solution[0](j+k*(n_coeff-1));
+            temp_solution[1](j+k*(n_coeff-1)) = temp_solution[1](j+1+k*(n_coeff-1)) - temp_solution[1](j+k*(n_coeff-1));
         }
     }
 
@@ -661,12 +535,12 @@ Vector3d BezierTrajGenerator::getPolyStates(int k, double t_seg, int order)
         int J_range = I_range - i;
         for(int j=0;j<J_range;++j)
         {
-            temp_solution[0](j+k*n_coeff) = (1.0-t)*temp_solution[0](j+k*n_coeff) + t*temp_solution[0](j+1+k*n_coeff);
-            temp_solution[1](j+k*n_coeff) = (1.0-t)*temp_solution[1](j+k*n_coeff) + t*temp_solution[1](j+1+k*n_coeff);
+            temp_solution[0](j+k*(n_coeff-1)) = (1.0-t)*temp_solution[0](j+k*(n_coeff-1)) + t*temp_solution[0](j+1+k*(n_coeff-1));
+            temp_solution[1](j+k*(n_coeff-1)) = (1.0-t)*temp_solution[1](j+k*(n_coeff-1)) + t*temp_solution[1](j+1+k*(n_coeff-1));
         }
     }
-    ret(0)=temp_solution[0](0+k*n_coeff);
-    ret(1)=temp_solution[1](0+k*n_coeff);
+    ret(0)=temp_solution[0](0+k*(n_coeff-1));
+    ret(1)=temp_solution[1](0+k*(n_coeff-1));
 
     ret = prefix*ret;
 

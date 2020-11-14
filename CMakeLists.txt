@@ -57,7 +57,8 @@ add_library(BezierTrajGenerator
 target_link_libraries(BezierTrajGenerator
         ${catkin_LIBRARIES}
         ${CERES_LIBRARIES}
-        OsqpEigen::OsqpEigen)
+        OsqpEigen::OsqpEigen
+        osqp::osqp)
 
 add_executable(BezierNode App/Bezier_node.cpp
         )

@@ -34,6 +34,8 @@ private:
 
     vector<Cube> _corridor;
 
+    double _max_t_seg = 1;
+
     Eigen::Vector3d _start_pt;
     Eigen::Vector3d _end_pt;
 
@@ -59,8 +61,6 @@ private:
     Eigen::VectorXd getbeq(int axis);
 
     Eigen::MatrixXd getAieq();
-
-    Eigen::VectorXd getbieq(int axis);
 
     Eigen::MatrixXd getAieq_plus();
 
