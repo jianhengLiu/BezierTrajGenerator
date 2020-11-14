@@ -1,0 +1,61 @@
+<launch>
+    <arg name="initial_pose_x" default="0.0"/>
+    <arg name="initial_pose_y" default="0.0"/>
+    <arg name="initial_pose_a" default="0.0"/><!-- yaw -->
+
+    <arg name="model_type" default="omni"/>
+
+
+    <param name="/use_sim_time" value="false"/>
+
+    <arg name="odom_frame" default="odom"/>               <!-- 里程计坐标系 -->
+
+    <!-- 设置地图的配置文件 -->
+    <arg name="map" default="RaceMap.yaml"/>
+
+    <node name="map_server" pkg="map_server" type="map_server" args="$(find mapping)/maps/$(arg map)" output="screen"/>
+
+
+    <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
+        <param name="output_frame" value="$(arg odom_frame)"/>
+        <param name="base_footprint_frame" value="base_footprint"/>
+        <param name="freq" value="30.0"/>
+        <param name="sensor_timeout" value="1.0"/>
+        <!--        SubTopic: /odom (nav_msgs/Odometry)-->
+        <param name="odom_used" value="true"/>
+        <!--        SubTopic: /imu_data (sensor_msgs/Imu)-->
+        <param name="imu_used" value="true"/>
+        <!--        SubTopic: /vo (nav_msgs/Odometry)-->
+        <param name="vo_used" value="false"/>
+
+        <!--        <remap from="odom" to="pr2_base_odometry/odom" />-->
+    </node>
+
+    <!--- Run AMCL -->
+    <node pkg="amcl" type="amcl" name="amcl">
+        <param name="initial_pose_x" value="$(arg initial_pose_x)"/>
+        <param name="initial_pose_y" value="$(arg initial_pose_y)"/>
+        <param name="initial_pose_a" value="$(arg initial_pose_a)"/>
+        <!-- Publish scans from best pose at a max of 10 Hz -->
+        <param name="odom_model_type" value="$(arg model_type)"/>
+        <param name="odom_frame_id" value="odom"/>
+
+        <param name="use_map_topic" value="true"/>
+        <param name="first_map_only" value="false"/>
+    </node>
+
+<!--    <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">-->
+<!--        <rosparam file="$(find mapping)/config/costmap_common_params.yaml" command="load" ns="global_costmap"/>-->
+<!--        <rosparam file="$(find mapping)/config/costmap_common_params.yaml" command="load" ns="local_costmap"/>-->
+<!--        <rosparam file="$(find mapping)/config/local_costmap_params.yaml" command="load"/>-->
+<!--        <rosparam file="$(find mapping)/config/global_costmap_params.yaml" command="load"/>-->
+<!--        <rosparam file="$(find mapping)/config/dwa_local_planner_params.yaml" command="load"/>-->
+
+<!--        <param name="base_global_planner" value="global_planner/GlobalPlanner"/>-->
+<!--&lt;!&ndash;        RAstar_planner/RAstarPlannerROS&ndash;&gt;-->
+<!--        <param name="base_local_planner" value="dwa_local_planner/DWAPlannerROS"/>-->
+<!--&lt;!&ndash;        <param name="controller_frequency" value="10.0"/>&ndash;&gt;-->
+<!--    </node>-->
+
+</launch>
+
