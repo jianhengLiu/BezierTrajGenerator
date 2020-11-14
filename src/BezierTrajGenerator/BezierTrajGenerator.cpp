@@ -85,101 +85,6 @@ double Factorial(int x)
     return fac;
 }
 
-double nchoosek(int n,int k)
-{
-    return Factorial(n)/(Factorial(n-k)*Factorial(k));
-}
-
-//bool BezierTrajGenerator::TrajGeneration(Eigen::Vector3d start_pt,Eigen::Vector3d end_pt,vector<Cube> corridor)
-//{
-//    isTraj= false;
-//
-//    _corridor = corridor;
-//    _start_pt = start_pt;
-//    _end_pt = end_pt;
-//
-//    n_seg = corridor.size();//  有多少个走廊就有多少段轨迹
-//    n_all_coeff = n_seg*n_coeff;
-//
-//    timeAllocation();
-//
-//    auto M = getM();
-//    auto Q = getQ();
-//    auto Q_0 = M.transpose()*Q*M;
-//
-////  将Q_0优化为最近半正定对称矩阵
-//    MatrixXd Q_0_nearest = nearestSPD(Q_0);
-//
-//    // allocate QP problem matrices and vectores
-//    Eigen::SparseMatrix<double> hessian; //P or H
-//    Eigen::VectorXd gradient;  //f or q
-//    Eigen::SparseMatrix<double> linearMatrix;  //A
-//    Eigen::VectorXd lowerBound; //l
-//    Eigen::VectorXd upperBound; //u
-//
-//    hessian = Q_0_nearest.sparseView();
-//    gradient = Eigen::VectorXd::Zero(Q_0_nearest.rows());
-//
-//    auto Aeq = getAeq();
-//    auto Aieq = getAieq();
-//    Eigen::MatrixXd A = MatrixXd::Zero(Aeq.rows()+Aieq.rows(),Aeq.cols());//(Aieq.rows(),Aeq.cols());
-//    A<<Aeq,
-//            Aieq;
-//    int NumberOfVariables = A.cols(); //A矩阵的列数
-//    int NumberOfConstraints = A.rows(); //A矩阵的行数
-//    linearMatrix = A.sparseView();
-//
-//
-//    // instantiate the solver
-//    OsqpEigen::Solver solver;
-//
-//    // settings
-//    solver.settings()->setVerbosity(false);//   设置是否查看迭代过程
-////    solver.settings()->setRho(0.5);
-//    solver.settings()->setMaxIteraction(1000000);
-//
-//    // set the initial data of the QP solver
-//    //矩阵A为m*n矩阵
-//    solver.data()->setNumberOfVariables(NumberOfVariables); //设置A矩阵的列数，即n
-//    solver.data()->setNumberOfConstraints(NumberOfConstraints); //设置A矩阵的行数，即m
-//    if(!solver.data()->setHessianMatrix(hessian)) return 1;//设置P矩阵
-//    if(!solver.data()->setGradient(gradient)) return 1; //设置q or f矩阵。当没有时设置为全0向量
-//    if(!solver.data()->setLinearConstraintsMatrix(linearMatrix)) return 1;//设置线性约束的A矩阵
-//
-//    _BezierSolution.clear();
-//    for(int i = 0;i<2;++i)
-//    {
-//        solver.clearSolver();
-//
-//        lowerBound.resize(A.rows());
-//        lowerBound<<getbeq(i),
-//                Eigen::VectorXd::Constant(Aieq.rows(),-OsqpEigen::INFTY) ;
-//
-//        upperBound.resize(A.rows());
-//        upperBound<<getbeq(i),
-//                getbieq(i);
-//
-//        if(!solver.data()->setLowerBound(lowerBound)) return 1;//设置下边界
-//        if(!solver.data()->setUpperBound(upperBound)) return 1;//设置上边界
-//
-//        // instantiate the solver
-//        if(!solver.initSolver()) return 1;
-//
-//        // solve the QP problem
-//        if(!solver.solve())
-//            return 1;
-//        else
-//            isTraj=true;
-//
-//        // get the controller input
-//        _BezierSolution.push_back(solver.getSolution());
-//
-////        std::cout << "QPSolution:" << std::endl << solver.getSolution() << std::endl;
-//    }
-//
-//
-//}
-
 bool BezierTrajGenerator::TrajGeneration(Eigen::Vector3d start_pt,Eigen::Vector3d end_pt,vector<Cube> corridor)
 {
     isTraj= false;
@@ -211,7 +116,7 @@ bool BezierTrajGenerator::TrajGeneration(Eigen::Vector3d start_pt,Eigen::Vector3
     gradient = Eigen::VectorXd::Zero(Q_0_nearest.rows());
 
     auto Aeq = getAeq();
-    auto Aieq = getAieq_plus();
+    auto Aieq = getAieq();
     Eigen::MatrixXd A = MatrixXd::Zero(Aeq.rows()+Aieq.rows(),Aeq.cols());
     A<<Aeq,
             Aieq;
@@ -494,13 +399,6 @@ Eigen::MatrixXd BezierTrajGenerator::getAieq() {
     }
     Aieq_p_plus.block(n_constraint_p - 6, n_all_coeff - 7, 6, 6) = MatrixXd::Identity(6, 6);//   因为每段轨迹间共用一个控制点,所以最后要留空给终点(等式约束)
 
-    MatrixXd Aieq_p_minus = -Aieq_p_plus;//  a<Ac -> -Ac<-a
-
-    MatrixXd Aieq_p = MatrixXd::Zero(2 * n_constraint_p, n_all_coeff);//   x2:+-约束
-    Aieq_p<<Aieq_p_plus,
-            Aieq_p_minus;
-
-
     int n_constraint_v = n_seg*n_order;
     int d1 = n_order;
     int d2 = n_order*(n_order-1);
@@ -518,10 +416,6 @@ Eigen::MatrixXd BezierTrajGenerator::getAieq() {
     {
         Aieq_v_plus.block((n_coeff-1)*i,n_coeff*i,7,8) = derivate_matrix;
     }
-    MatrixXd Aieq_v_minus = -Aieq_v_plus;
-    MatrixXd Aieq_v = MatrixXd::Zero(2*n_constraint_v,n_all_coeff);
-    Aieq_v<<Aieq_v_plus,
-            Aieq_v_minus;
 
     int n_constraint_a = n_seg*(n_coeff-2);
     MatrixXd dderivate_matrix(6,8);
@@ -536,19 +430,15 @@ Eigen::MatrixXd BezierTrajGenerator::getAieq() {
     {
         Aieq_a_plus.block((n_coeff-2)*i,n_coeff*i,6,8) =dderivate_matrix;
     }
-    MatrixXd Aieq_a_minus = -Aieq_a_plus;
-    MatrixXd Aieq_a = MatrixXd::Zero(2*n_constraint_a,n_all_coeff);
-    Aieq_a<<Aieq_a_plus,
-            Aieq_a_minus;
 
-    MatrixXd Aieq(2*(n_constraint_p),n_all_coeff);//+n_constraint_v+n_constraint_a
-    Aieq<<Aieq_p;
+    MatrixXd Aieq_plus((n_constraint_p),n_all_coeff);//+n_constraint_v+n_constraint_a
+    Aieq_plus<<Aieq_p_plus;
 //            Aieq_v;
 //            Aieq_a;
 //    cout<<Aieq_a<<endl;
 //    cout<<"Aieq_a.rows()"<<Aieq_a.rows()<<endl;
 //    cout<<"Aieq_a.cols()"<<Aieq_a.cols()<<endl;
-    return Aieq;
+    return Aieq_plus;
 }
 
 /**
@@ -639,65 +529,6 @@ Eigen::VectorXd BezierTrajGenerator::getbieq(int axis){
     cout<<bieq_p<<endl;
     cout<<"bieq_a.rows()"<<bieq_p.rows()<<endl;
     return bieq;
-}
-
-Eigen::MatrixXd BezierTrajGenerator::getAieq_plus() {
-    int n_constraint_p = n_seg*(n_coeff-1)-1;   //  去掉首尾,首尾已有等式约束限制
-
-    /**
-     * Ac<b
-     */
-    MatrixXd Aieq_p_plus = MatrixXd::Zero(n_constraint_p, n_all_coeff);
-    for(int i = 0;i<n_seg-1;++i)//  n_seg-1:最后一段单独设置(终点是等式约束)
-    {
-        /**
-         * (n_coeff-1)*i:   因为不考虑初始点,同理往后顺延所以带入的是eye(7)
-         * 1+n_coeff*i:   不含初始点(因为初始点是等式约束)
-         */
-        Aieq_p_plus.block((n_coeff-1)*i, 1+n_coeff*i, 7, 7) = MatrixXd::Identity(7, 7);
-    }
-    Aieq_p_plus.block(n_constraint_p - 6, n_all_coeff - 7, 6, 6) = MatrixXd::Identity(6, 6);//   因为每段轨迹间共用一个控制点,所以最后要留空给终点(等式约束)
-
-    int n_constraint_v = n_seg*n_order;
-    int d1 = n_order;
-    int d2 = n_order*(n_order-1);
-
-    MatrixXd derivate_matrix(7,8);
-    derivate_matrix<<-d1, d1,  0,   0,   0,   0,   0,  0,
-            0, -d1, d1,   0,   0,   0,   0,  0,
-            0,  0, -d1,  d1,   0,   0,   0,  0,
-            0,  0,   0, -d1,  d1,   0,   0,  0,
-            0,  0,   0,   0, -d1,  d1,   0,  0,
-            0,  0,   0,   0,   0, -d1,  d1,  0,
-            0,  0,   0,   0,   0,   0, -d1, d1;
-    MatrixXd Aieq_v_plus = MatrixXd::Zero(n_constraint_v,n_all_coeff);
-    for(int i =0;i<n_seg;++i)
-    {
-        Aieq_v_plus.block((n_coeff-1)*i,n_coeff*i,7,8) = derivate_matrix;
-    }
-
-    int n_constraint_a = n_seg*(n_coeff-2);
-    MatrixXd dderivate_matrix(6,8);
-    dderivate_matrix<<d2, -2*d2,    d2,     0,     0,     0,     0,  0,
-            0,    d2, -2*d2,    d2,     0,     0,     0,  0,
-            0,     0,    d2, -2*d2,    d2,     0,     0,  0,
-            0,     0,     0,    d2, -2*d2,    d2,     0,  0,
-            0,     0,     0,     0,    d2, -2*d2,    d2,  0,
-            0,     0,     0,     0,     0,    d2, -2*d2,  d2;
-    MatrixXd Aieq_a_plus = MatrixXd::Zero(n_constraint_a,n_all_coeff);
-    for(int i =0;i<n_seg;++i)
-    {
-        Aieq_a_plus.block((n_coeff-2)*i,n_coeff*i,6,8) =dderivate_matrix;
-    }
-
-    MatrixXd Aieq_plus((n_constraint_p),n_all_coeff);//+n_constraint_v+n_constraint_a
-    Aieq_plus<<Aieq_p_plus;
-//            Aieq_v;
-//            Aieq_a;
-//    cout<<Aieq_a<<endl;
-//    cout<<"Aieq_a.rows()"<<Aieq_a.rows()<<endl;
-//    cout<<"Aieq_a.cols()"<<Aieq_a.cols()<<endl;
-    return Aieq_plus;
 }
 
 Eigen::VectorXd BezierTrajGenerator::getbieq_plus(int axis){
@@ -838,30 +669,8 @@ Vector3d BezierTrajGenerator::getPolyStates(int k, double t_seg, int order)
 
     ret = prefix*ret;
 
-//    for(int i=0;i<=n_order-order;++i)
-//    {
-//        double basis_p = nchoosek(n_order-order,i)*pow(t,i)*pow(1-t,n_order-i);
-//        ret(0)+=_BezierSolution[0](i+k*n_coeff)*basis_p;
-//        ret(1)+=_BezierSolution[1](i+k*n_coeff)*basis_p;
-//    }
     return ret;
 }
-
-//Vector3d BezierTrajGenerator::getPolyStates(int k, double t_seg, int order)
-//{
-//    Vector3d ret(0,0,0);
-//
-//    double t = t_seg/_corridor[k].t;
-//
-//    for(int i=0;i<=n_order;++i)
-//    {
-//        double basis_p = nchoosek(n_order,i)*pow(t,i)*pow(1-t,n_order-i);
-//        ret(0)+=_BezierSolution[0](i+k*n_coeff)*basis_p;
-//        ret(1)+=_BezierSolution[1](i+k*n_coeff)*basis_p;
-//    }
-//    return ret;
-//}
-
 
 Vector3d BezierTrajGenerator::getTrajectoryStates(double time_from_start, int order)
 {
@@ -891,37 +700,6 @@ Vector3d BezierTrajGenerator::getTrajectoryStates(double time_from_start, int or
 
     return states;
 }
-
-
-//Vector3d BezierTrajGenerator::getTrajectoryStates(double time_from_start, int order)
-//{
-////    每一段轨迹的时间起始于0
-////    t所在的时间段的初始时间
-//    double t_init = 0;
-////    t在其对应时间段上的时间
-//    double t_seg = 0;
-//
-//    //找出对应时间对应的第几段轨迹
-//    int seg_idx = 0;
-//
-//    for (int i = 0; i < _polyTime.size(); i++)
-//    {
-//        if (time_from_start >= t_init + _polyTime(i))
-//        {
-//            t_init += _polyTime(i);
-//        } else
-//        {
-//            t_seg = time_from_start - t_init;
-//            seg_idx = i;
-//            break;
-//        }
-//    }
-//
-//    Vector3d states = getPolyStates(seg_idx, t_seg, order);
-//
-//    return states;
-//}
-
 
 visualization_msgs::Marker BezierTrajGenerator::visBezierTraj()
 {
