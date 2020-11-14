@@ -388,16 +388,17 @@ Eigen::MatrixXd BezierTrajGenerator::getAieq() {
     /**
      * Ac<b
      */
-    MatrixXd Aieq_p_plus = MatrixXd::Zero(n_constraint_p, n_all_coeff);
+    MatrixXd Aieq_p = MatrixXd::Zero(n_constraint_p, n_all_coeff);
     for(int i = 0;i<n_seg-1;++i)//  n_seg-1:最后一段单独设置(终点是等式约束)
     {
         /**
          * (n_coeff-1)*i:   因为不考虑初始点,同理往后顺延所以带入的是eye(7)
          * 1+n_coeff*i:   不含初始点(因为初始点是等式约束)
          */
-        Aieq_p_plus.block((n_coeff-1)*i, 1+n_coeff*i, 7, 7) = MatrixXd::Identity(7, 7);
+        Aieq_p.block((n_coeff - 1) * i, 1 + n_coeff * i, 7, 7) = MatrixXd::Identity(7, 7);
     }
-    Aieq_p_plus.block(n_constraint_p - 6, n_all_coeff - 7, 6, 6) = MatrixXd::Identity(6, 6);//   因为每段轨迹间共用一个控制点,所以最后要留空给终点(等式约束)
+    Aieq_p.block(n_constraint_p - 6, n_all_coeff - 7, 6, 6) = MatrixXd::Identity(6, 6);//   因为每段轨迹间共用一个控制点,所以最后要留空给终点(等式约束)
+
 
     int n_constraint_v = n_seg*n_order;
     int d1 = n_order;
@@ -411,10 +412,10 @@ Eigen::MatrixXd BezierTrajGenerator::getAieq() {
             0,  0,   0,   0, -d1,  d1,   0,  0,
             0,  0,   0,   0,   0, -d1,  d1,  0,
             0,  0,   0,   0,   0,   0, -d1, d1;
-    MatrixXd Aieq_v_plus = MatrixXd::Zero(n_constraint_v,n_all_coeff);
+    MatrixXd Aieq_v = MatrixXd::Zero(n_constraint_v, n_all_coeff);
     for(int i =0;i<n_seg;++i)
     {
-        Aieq_v_plus.block((n_coeff-1)*i,n_coeff*i,7,8) = derivate_matrix;
+        Aieq_v.block((n_coeff - 1) * i, n_coeff * i, 7, 8) = derivate_matrix;
     }
 
     int n_constraint_a = n_seg*(n_coeff-2);
@@ -425,20 +426,20 @@ Eigen::MatrixXd BezierTrajGenerator::getAieq() {
             0,     0,     0,    d2, -2*d2,    d2,     0,  0,
             0,     0,     0,     0,    d2, -2*d2,    d2,  0,
             0,     0,     0,     0,     0,    d2, -2*d2,  d2;
-    MatrixXd Aieq_a_plus = MatrixXd::Zero(n_constraint_a,n_all_coeff);
+    MatrixXd Aieq_a = MatrixXd::Zero(n_constraint_a, n_all_coeff);
     for(int i =0;i<n_seg;++i)
     {
-        Aieq_a_plus.block((n_coeff-2)*i,n_coeff*i,6,8) =dderivate_matrix;
+        Aieq_a.block((n_coeff - 2) * i, n_coeff * i, 6, 8) =dderivate_matrix;
     }
 
-    MatrixXd Aieq_plus((n_constraint_p),n_all_coeff);//+n_constraint_v+n_constraint_a
-    Aieq_plus<<Aieq_p_plus;
+    MatrixXd Aieq((n_constraint_p), n_all_coeff);//+n_constraint_v+n_constraint_a
+    Aieq << Aieq_p;
 //            Aieq_v;
 //            Aieq_a;
 //    cout<<Aieq_a<<endl;
 //    cout<<"Aieq_a.rows()"<<Aieq_a.rows()<<endl;
 //    cout<<"Aieq_a.cols()"<<Aieq_a.cols()<<endl;
-    return Aieq_plus;
+    return Aieq;
 }
 
 /**
