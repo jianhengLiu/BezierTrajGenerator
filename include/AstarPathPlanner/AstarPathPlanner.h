@@ -47,10 +47,17 @@ public:
         //Reset map
         resetUsedGrids();
 
-        Eigen::Vector3d start_pt = currentPos;//(0.6,-0.7,0);
+        Eigen::Vector3d start_pt = currentPos;
         Eigen::Vector3d target_pt(goal_msg->pose.position.x,goal_msg->pose.position.y,goal_msg->pose.position.z);
 
-        AstarGraphSearch(start_pt,target_pt);
+        if((target_pt - start_pt).norm()<0.05)
+        {
+            return;
+        }
+        else
+        {
+            AstarGraphSearch(start_pt,target_pt);
+        }
 
         //Retrieve the path
         auto grid_path     = getPath();

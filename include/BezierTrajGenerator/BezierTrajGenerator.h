@@ -9,7 +9,7 @@
 #include <vector>
 #include <math.h>
 
-#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 #include <nav_msgs/Path.h>
 #include <geometry_msgs/PoseStamped.h>
 
@@ -106,7 +106,7 @@ public:
     Eigen::Vector3d getTrajectoryStates(double time_from_start, int order);
 
     visualization_msgs::Marker visBezierTraj();//返回用于可视化的路径Marker
-    visualization_msgs::Marker visBezierPt();
+    visualization_msgs::MarkerArray visBezierPt();
 
 
 };

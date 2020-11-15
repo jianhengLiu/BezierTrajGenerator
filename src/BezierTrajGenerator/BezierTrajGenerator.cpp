@@ -19,13 +19,11 @@ bool isSPD(MatrixXd A)
     //reassemble sigma bar
     MatrixXd A_test = L * L.transpose();
 
-
     if (A.isApprox(A_test))
     {
         // std::cout << "Matrix is SPD" << std::endl;
         return true;
     }
-
 //    std::cout << "Matrix is NOT SPD" << std::endl;
     return false;
 }
@@ -121,8 +119,8 @@ bool BezierTrajGenerator::TrajGeneration(Eigen::Vector3d start_pt,Eigen::Vector3
 
     // settings
     solver.settings()->setVerbosity(false);//   设置是否查看迭代过程
-    solver.settings()->setRelativeTolerance(5e-02);
-//    solver.settings()->setRho(0.2);// 设置步长
+    solver.settings()->setWarmStart(true);//    a starting of the optimization algorithm in a state where it is close to the optimum.
+    solver.settings()->setRelativeTolerance(2e-02);
     solver.settings()->setMaxIteraction(1000000);
 
     // set the initial data of the QP solver
@@ -146,6 +144,11 @@ bool BezierTrajGenerator::TrajGeneration(Eigen::Vector3d start_pt,Eigen::Vector3
         upperBound<<getbeq(i),
                 getbieq_plus(i);
 
+        cout<<"getbieq_plus(i)"<<endl;
+        cout<<getbieq_plus(i)<<endl;
+        cout<<"getbieq_minus(i)"<<endl;
+        cout<<getbieq_minus(i)<<endl;
+
         if(!solver.data()->setLowerBound(lowerBound)) return 1;//设置下边界
         if(!solver.data()->setUpperBound(upperBound)) return 1;//设置上边界
 
@@ -167,7 +170,6 @@ bool BezierTrajGenerator::TrajGeneration(Eigen::Vector3d start_pt,Eigen::Vector3
             _BezierSolution.push_back(solver.getSolution());
 //        std::cout << "QPSolution:" << std::endl << solver.getSolution() << std::endl;
         }
-
     }
 }
 
@@ -191,7 +193,7 @@ void BezierTrajGenerator::timeAllocation()
         }
         else if(i ==n_seg-1)
         {
-            dis = (_end_pt-_corridor[i].center).norm();
+            dis = (_end_pt-_corridor[i-1].center).norm();
         }
         else
         {
@@ -373,8 +375,8 @@ Eigen::MatrixXd BezierTrajGenerator::getAieq() {
     }
 
     int n_constraint_v = n_all_coeff-3;
-    int d1 = n_order/_max_t_seg;
-    int d2 = n_order*(n_order-1)/(_max_t_seg*_max_t_seg);
+    int d1 = 1/_max_t_seg;//n_order/_max_t_seg;
+    int d2 = 1/(_max_t_seg*_max_t_seg);//n_order*(n_order-1)/(_max_t_seg*_max_t_seg);
 
     MatrixXd derivate_matrix(1,2);
     derivate_matrix<<-d1, d1;
@@ -431,16 +433,7 @@ Eigen::VectorXd BezierTrajGenerator::getbieq_plus(int axis){
          */
         if(i!=n_seg-1)
         {
-                bieq_p_plus(first_coeff_index+n_coeff-2) = min(_corridor[i].max_pt(axis),_corridor[i+1].max_pt(axis));
-
-//            if(_corridor[i+1].max_pt(axis)>_corridor[i].max_pt(axis))//    对比相关点当前走廊最大限制和下一走廊最小限制,取最大的作为限制
-//            {
-//                bieq_p_plus(first_coeff_index+n_coeff-2) = max(_corridor[i].max_pt(axis),_corridor[i+1].min_pt(axis));
-//            }
-//            else
-//            {
-//                bieq_p_plus(first_coeff_index+n_coeff-2) = max(_corridor[i].min_pt(axis),_corridor[i+1].max_pt(axis));
-//            }
+            bieq_p_plus(first_coeff_index+n_coeff-2) = min(_corridor[i].max_pt(axis),_corridor[i+1].max_pt(axis));
         }
     }
 
@@ -480,17 +473,7 @@ Eigen::VectorXd BezierTrajGenerator::getbieq_minus(int axis){
          */
         if(i!=n_seg-1)
         {
-                bieq_p_minus(first_coeff_index+n_coeff-2) = max(_corridor[i].min_pt(axis),_corridor[i+1].min_pt(axis));
-
-
-//            if(_corridor[i+1].max_pt(axis)>_corridor[i].max_pt(axis))//    对比相关点当前走廊最大限制和下一走廊最小限制,取最大的作为限制
-//            {
-//                bieq_p_minus(first_coeff_index+n_coeff-2) = min(_corridor[i].max_pt(axis),_corridor[i+1].min_pt(axis));
-//            }
-//            else
-//            {
-//                bieq_p_minus(first_coeff_index+n_coeff-2) = min(_corridor[i].min_pt(axis),_corridor[i+1].max_pt(axis));
-//            }
+            bieq_p_minus(first_coeff_index+n_coeff-2) = max(_corridor[i].min_pt(axis),_corridor[i+1].min_pt(axis));
         }
     }
 
@@ -620,41 +603,50 @@ visualization_msgs::Marker BezierTrajGenerator::visBezierTraj()
     return _traj_vis;
 }
 
-visualization_msgs::Marker BezierTrajGenerator::visBezierPt()
+visualization_msgs::MarkerArray BezierTrajGenerator::visBezierPt()
 {
-    visualization_msgs::Marker _bezierPt_vis;
+    visualization_msgs::MarkerArray _bezierPtArray;
+    visualization_msgs::Marker _bezierPt;
 
-    _bezierPt_vis.header.stamp = ros::Time::now();
-    _bezierPt_vis.header.frame_id = "map";
+    _bezierPt.header.stamp = ros::Time::now();
+    _bezierPt.header.frame_id = "map";
 
-    _bezierPt_vis.ns = "_bezierPt_vis";
-    _bezierPt_vis.id = 0;
-    _bezierPt_vis.type = visualization_msgs::Marker::SPHERE_LIST;
-    _bezierPt_vis.action = visualization_msgs::Marker::ADD;
-    _bezierPt_vis.scale.x = 0.2;
-    _bezierPt_vis.scale.y = 0.2;
-    _bezierPt_vis.scale.z = 0.2;
-    _bezierPt_vis.pose.orientation.x = 0.0;
-    _bezierPt_vis.pose.orientation.y = 0.0;
-    _bezierPt_vis.pose.orientation.z = 0.0;
-    _bezierPt_vis.pose.orientation.w = 1.0;
+    _bezierPt.ns = "_bezierPt";
+    _bezierPt.type = visualization_msgs::Marker::SPHERE;
+    _bezierPt.action = visualization_msgs::Marker::ADD;
+    _bezierPt.scale.x = 0.2;
+    _bezierPt.scale.y = 0.2;
+    _bezierPt.scale.z = 0.2;
+    _bezierPt.pose.orientation.x = 0.0;
+    _bezierPt.pose.orientation.y = 0.0;
+    _bezierPt.pose.orientation.z = 0.0;
+    _bezierPt.pose.orientation.w = 1.0;
 
-    _bezierPt_vis.color.a = 1.0;
-    _bezierPt_vis.color.r = 1.0;
-    _bezierPt_vis.color.g = 1.0;
-    _bezierPt_vis.color.b = 0.0;
+    _bezierPt.points.clear();
 
-    _bezierPt_vis.points.clear();
+    _bezierPt.color.a = 1.0;
+    _bezierPt.color.r = 0.0;
+    _bezierPt.color.g = 1.0;
+    _bezierPt.color.b = 0.0;
+    _bezierPt.pose.position.z = 0.1;
 
-    geometry_msgs::Point pt;
+    _bezierPt.lifetime.sec = 10;
 
     for (int k = 0;k<_BezierSolution[0].size();++k)
     {
-        pt.x = _BezierSolution[0](k);
-        pt.y = _BezierSolution[1](k);
-        pt.z = 0.2;
-        _bezierPt_vis.points.push_back(pt);
+        _bezierPt.id = k;
+
+        _bezierPt.pose.position.x = _BezierSolution[0](k);
+        _bezierPt.pose.position.y = _BezierSolution[1](k);
+        if(k!=0&&k%7==0)
+        {
+            _bezierPt.color.a = 1.0;
+            _bezierPt.color.r = (double)k/_BezierSolution[0].size();
+            _bezierPt.color.g = 1.0-(double)k/_BezierSolution[0].size();
+            _bezierPt.color.b = (double)k/_BezierSolution[0].size();
+        }
+        _bezierPtArray.markers.push_back(_bezierPt);
     }
 
-    return _bezierPt_vis;
+    return _bezierPtArray;
 }

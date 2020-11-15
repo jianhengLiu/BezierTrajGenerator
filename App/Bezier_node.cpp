@@ -8,14 +8,16 @@
 #include <iostream>
 
 #include <visualization_msgs/MarkerArray.h>
-#include <geometry_msgs/Twist.h>
 
 using namespace std;
 using namespace Eigen;
 
 AstarPathPlanner*  _AstarPathPlanner;
+BezierTrajGenerator* _BezierTrajGenerator;
 
 ros::Publisher _corridor_vis_pub;
+
+void visCorridor(vector<Cube> corridor);
 
 Cube generateCube( Vector3d pt)
 {
@@ -54,6 +56,16 @@ bool isContains(Cube cube1, Cube cube2)
 {
     if( cube1.vertex(0, 0) >= cube2.vertex(0, 0) && cube1.vertex(0, 1) <= cube2.vertex(0, 1) && cube1.vertex(0, 2) >= cube2.vertex(0, 2) &&
         cube1.vertex(6, 0) <= cube2.vertex(6, 0) && cube1.vertex(6, 1) >= cube2.vertex(6, 1) && cube1.vertex(6, 2) <= cube2.vertex(6, 2)  )
+        return true;
+    else
+        return false;
+}
+
+bool isSimilar(Cube cube1, Cube cube2)
+{
+    double threshold = 0.3;
+    if( cube1.vertex(0, 0)+threshold >= cube2.vertex(0, 0) && cube1.vertex(0, 1)-threshold <= cube2.vertex(0, 1) && cube1.vertex(0, 2)+threshold >= cube2.vertex(0, 2) &&
+        cube1.vertex(6, 0)-threshold <= cube2.vertex(6, 0) && cube1.vertex(6, 1)+threshold >= cube2.vertex(6, 1) && cube1.vertex(6, 2)-threshold <= cube2.vertex(6, 2)  )
         return true;
     else
         return false;
@@ -351,7 +363,6 @@ pair<Cube, bool> inflateCube(Cube cube, Cube lstcube)
     return make_pair(cubeMax, true);
 }
 
-
 vector<Cube> corridorGeneration(vector<Vector3d> path_coord)
 {
     vector<Cube> cubeList;
@@ -375,6 +386,67 @@ vector<Cube> corridorGeneration(vector<Vector3d> path_coord)
         cubeList.push_back(cube);
     }
     return cubeList;
+}
+
+vector<Cube> simplifyCorridor(vector<Cube> corridor)
+{
+    vector<Cube> simplifyCorridor;
+
+    for(int j = (int)corridor.size() - 1; j >= 0; j--)
+    {
+        for(int k = j - 1; k >= 0; k--)
+        {
+            if(isSimilar(corridor[j], corridor[k]))
+                corridor[k].valid = false;
+        }
+    }
+
+    for(auto cube:corridor)
+        if(cube.valid == true)
+            simplifyCorridor.push_back(cube);
+
+    return simplifyCorridor;
+}
+
+int main(int argc, char **argv) {
+    ros::init(argc, argv, "BezierTrajPlanner");//初始化ROS节点
+    ros::NodeHandle n;
+    ros::Rate rate(100);
+
+    ros::Publisher _bezierPt_vis_pub  = n.advertise<visualization_msgs::MarkerArray>("/vis_bezierPt", 1);
+    ros::Publisher _bezier_traj_pub = n.advertise<visualization_msgs::Marker>("vis_trajectory", 1);
+
+    _corridor_vis_pub  = n.advertise<visualization_msgs::MarkerArray>("/vis_corridor", 1);
+
+    _AstarPathPlanner = new AstarPathPlanner;
+    _BezierTrajGenerator = new BezierTrajGenerator(1,0.5);
+    while (ros::ok()) {
+        if(_AstarPathPlanner->is_Path)
+        {
+            std::vector<Eigen::Vector3d> Path = _AstarPathPlanner->getPath();
+
+            auto corridor = corridorGeneration(Path);
+            auto _simplify_corridor = simplifyCorridor(corridor);
+
+            visCorridor(_simplify_corridor);
+
+            Eigen::Vector3d start_pt = Path.front();
+            Eigen::Vector3d end_pt = Path.back();
+            _BezierTrajGenerator->TrajGeneration(start_pt,end_pt,_simplify_corridor);
+
+            if(_BezierTrajGenerator->isTraj)
+            {
+                _bezierPt_vis_pub.publish(_BezierTrajGenerator->visBezierPt());
+                _bezier_traj_pub.publish(_BezierTrajGenerator->visBezierTraj());
+            }
+            _AstarPathPlanner->is_Path = false;
+        }
+
+        ros::spinOnce();
+        rate.sleep();
+
+    }
+    return 0;
 }
 
 visualization_msgs::MarkerArray cube_vis;
@@ -423,85 +495,5 @@ void visCorridor(vector<Cube> corridor)
     }
 
     _corridor_vis_pub.publish(cube_vis);
-}
-
-
-int main(int argc, char **argv) {
-    ros::init(argc, argv, "trajPlanner");//初始化ROS节点
-    ros::NodeHandle n;
-    ros::Rate rate(100);
-
-    ros::Publisher pub_cmd_vel = n.advertise<geometry_msgs::Twist>("/cmd_vel",1);
-    ros::Publisher _bezierPt_vis_pub  = n.advertise<visualization_msgs::Marker>("/vis_bezierPt", 1);
-
-    ros::Publisher _wp_traj_vis_pub = n.advertise<visualization_msgs::Marker>("vis_trajectory", 1);
-
-    _corridor_vis_pub  = n.advertise<visualization_msgs::MarkerArray>("/vis_corridor", 1);
-
-    geometry_msgs::Twist cmd_vel_msg;
-    cmd_vel_msg.angular.x = 0;
-    cmd_vel_msg.angular.y = 0;
-    cmd_vel_msg.angular.z = 0;
-
-    cmd_vel_msg.linear.z = 0;
-
-    _AstarPathPlanner = new AstarPathPlanner;
-    BezierTrajGenerator _BezierTrajGenerator(1,0.5);
-    double startTime = 0;
-    while (ros::ok()) {
-        if(_AstarPathPlanner->is_Path)
-        {
-            geometry_msgs::PoseStamped temp_wpt;
-            temp_wpt.header.frame_id = "map";
-            temp_wpt.pose.orientation.w = 1;
-            temp_wpt.pose.orientation.z = 0;
-            temp_wpt.pose.orientation.y = 0;
-            temp_wpt.pose.orientation.x = 0;
-
-            std::vector<Eigen::Vector3d> Path = _AstarPathPlanner->getPath();
-
-            auto corridor = corridorGeneration(Path);
-            visCorridor(corridor);
-
-            Eigen::Vector3d start_pt = Path.front();
-            Eigen::Vector3d end_pt = Path.back();
-            _BezierTrajGenerator.TrajGeneration(start_pt,end_pt,corridor);
-
-            if(_BezierTrajGenerator.isTraj)
-            {
-                _bezierPt_vis_pub.publish(_BezierTrajGenerator.visBezierPt());
-                _wp_traj_vis_pub.publish(_BezierTrajGenerator.visBezierTraj());
-            }
-            _AstarPathPlanner->is_Path = false;
-            startTime = ros::Time::now().toSec();
-        }
-
-        if(_BezierTrajGenerator.isTraj)
-        {
-            double t = ros::Time::now().toSec()-startTime;
-            if(_BezierTrajGenerator._totalTime>t)
-            {
-//                Vector3d desierPayloadPos = vect_Traj[cnt_traj].getTrajectoryStates(t,0);
-                Vector3d desierPayloadVel = _BezierTrajGenerator.getTrajectoryStates(t,1);
-                cmd_vel_msg.linear.x = desierPayloadVel.x();
-                cmd_vel_msg.linear.y = desierPayloadVel.y();
-            }
-            else
-            {
-                t = _BezierTrajGenerator._totalTime-0.001;
-//                Vector3d desierPayloadPos = _TrajGenerator.getTrajectoryStates(t,0);
-                Vector3d desierPayloadVel = Vector3d(0, 0, 0);
-                cmd_vel_msg.linear.x = desierPayloadVel.x();
-                cmd_vel_msg.linear.y = desierPayloadVel.y();
-
-            }
-//            pub_cmd_vel.publish(cmd_vel_msg);
-        }
-
-        ros::spinOnce();
-        rate.sleep();
-
-    }
-    return 0;
 }
 
