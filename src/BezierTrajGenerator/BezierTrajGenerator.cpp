@@ -144,11 +144,6 @@ bool BezierTrajGenerator::TrajGeneration(Eigen::Vector3d start_pt,Eigen::Vector3
         upperBound<<getbeq(i),
                 getbieq_plus(i);
 
-        cout<<"getbieq_plus(i)"<<endl;
-        cout<<getbieq_plus(i)<<endl;
-        cout<<"getbieq_minus(i)"<<endl;
-        cout<<getbieq_minus(i)<<endl;
-
         if(!solver.data()->setLowerBound(lowerBound)) return 1;//设置下边界
         if(!solver.data()->setUpperBound(upperBound)) return 1;//设置上边界
 

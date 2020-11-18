@@ -73,7 +73,7 @@ public:
 protected:
 
     GridNodePtr *** GridNodeMap;
-    Eigen::Vector3d currentPos;
+    Eigen::Vector3d currentPos = Eigen::Vector3d(0,0,0);
     Eigen::Vector3i goalIdx;
 
     GridNodePtr terminatePtr;
