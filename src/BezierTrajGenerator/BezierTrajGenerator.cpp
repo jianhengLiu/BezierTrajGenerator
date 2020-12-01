@@ -188,7 +188,7 @@ void BezierTrajGenerator::timeAllocation()
         }
         else if(i ==n_seg-1)
         {
-            dis = (_end_pt-_corridor[i-1].center).norm();
+            dis = (_end_pt-_corridor[i].center).norm();
         }
         else
         {
@@ -370,8 +370,8 @@ Eigen::MatrixXd BezierTrajGenerator::getAieq() {
     }
 
     int n_constraint_v = n_all_coeff-3;
-    int d1 = 1/_max_t_seg;//n_order/_max_t_seg;
-    int d2 = 1/(_max_t_seg*_max_t_seg);//n_order*(n_order-1)/(_max_t_seg*_max_t_seg);
+    double d1 = (double)1/_max_t_seg;//n_order/_max_t_seg;
+    double d2 = (double)1/(_max_t_seg*_max_t_seg);//n_order*(n_order-1)/(_max_t_seg*_max_t_seg);
 
     MatrixXd derivate_matrix(1,2);
     derivate_matrix<<-d1, d1;
