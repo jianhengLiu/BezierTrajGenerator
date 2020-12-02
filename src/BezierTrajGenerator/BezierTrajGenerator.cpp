@@ -182,11 +182,7 @@ void BezierTrajGenerator::timeAllocation()
     double dis =0;
     for (int i = 0; i < n_seg; ++i)
     {
-        if(n_seg==1)
-        {
-            dis = (_end_pt-_corridor[i].center).norm();
-        }
-        else if(i ==n_seg-1)
+        if(n_seg==1 || i == n_seg-1)
         {
             dis = (_end_pt-_corridor[i].center).norm();
         }
